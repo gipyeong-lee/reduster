@@ -1,5 +1,5 @@
 # reduster
-Redis Cluster Manager
+High Performance Redis Cluster Manager
 
 # Overview
 
