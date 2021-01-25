@@ -8,6 +8,8 @@ K/V String을 저장할 수 있는 분산 스토리지 라이브러리를 구현
 # Spec
 
 Language : kotlin
+Redis : 3.0.5
+
 
 # 기능
 
