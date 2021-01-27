@@ -3,6 +3,7 @@ package com.linegames.reduster.controller
 import com.linegames.reduster.domain.ApiResponse
 import com.linegames.reduster.domain.CommandResponse
 import com.linegames.reduster.support.RedisClusterManager
+import com.linegames.reduster.util.JumpConsistentHash
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
 
@@ -14,9 +15,9 @@ class RedisCommandController(val redisClusterManager: RedisClusterManager) {
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun get(@PathVariable key: String): CommandResponse {
-        val value = redisClusterManager.getValue(key)
+        val value = redisClusterManager.get(key)
         val server = redisClusterManager.searchServerKey(key)
-        return CommandResponse(value = value, server = server)
+        return CommandResponse(value = "${JumpConsistentHash.hash(key)}:${value}", server = server)
     }
 
     @PutMapping(
@@ -24,9 +25,28 @@ class RedisCommandController(val redisClusterManager: RedisClusterManager) {
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun set(@PathVariable key: String, @PathVariable value: String): CommandResponse {
-        val value = redisClusterManager.setValue(key, value)
+        val value = redisClusterManager.set(key, value)
         val server = redisClusterManager.searchServerKey(key)
         return CommandResponse(value = value, server = server)
+    }
+
+    @GetMapping(
+        "/mget/{keys}",
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun mget(@PathVariable keys: Set<String>): Map<String, String?> {
+        val value = redisClusterManager.mget(keys)
+        return value
+    }
+
+    @PostMapping(
+        "/mset",
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+        consumes = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun mset(@RequestBody body: Map<String, String>): Map<String, String> {
+        val value = redisClusterManager.mset(body)
+        return value
     }
 
     @GetMapping(

@@ -1,59 +1,128 @@
 package com.linegames.reduster.support
 
+import com.google.common.collect.Ordering
+import com.linegames.reduster.domain.ValueComparableMap
+import com.linegames.reduster.util.JumpConsistentHash
 import io.lettuce.core.RedisClient
 import io.lettuce.core.api.StatefulRedisConnection
 import io.lettuce.core.api.sync.RedisCommands
 import org.springframework.stereotype.Component
 import java.time.Duration
+import java.util.*
+import java.util.concurrent.ConcurrentSkipListMap
+import kotlin.concurrent.thread
 import kotlin.math.abs
 
 @Component
 class RedisClusterManager {
-    var servers: MutableMap<String, StatefulRedisConnection<String, String>> = mutableMapOf()
-    var degreeTables: HashMap<String, Float> = hashMapOf()
+    var hashTables: ValueComparableMap<String, Int> = ValueComparableMap(Ordering.natural())
+    var buckets: ConcurrentSkipListMap<Int, StatefulRedisConnection<String, String>> =
+        ConcurrentSkipListMap(Comparator.naturalOrder())
     var weight: Int = 10
-    fun setValue(key: String, value: String): String? {
-        command(key)?.set(key, value)
-        degreeTables[key] = calculateDegree(key)
-        return command(key)?.get(key)
+    fun mset(map: Map<String, String>): Map<String, String> {
+        map.keys.forEach { key ->
+            val valueKey = JumpConsistentHash.hash(key)
+            val serverKey = searchServerKeyByHash(valueKey)
+            buckets[serverKey]!!.sync().set(key, map[key])
+            hashTables[key] = valueKey
+        }
+        return map
     }
 
-    fun getValue(key: String): String? {
+    fun mget(keys: Set<String>): Map<String, String?> {
+        var mutableMap = mutableMapOf<String, String?>()
+        keys.forEach { key ->
+            val valueKey = JumpConsistentHash.hash(key)
+            val serverKey = searchServerKeyByHash(valueKey)
+            mutableMap[key] = buckets[serverKey]!!.sync().get(key)
+        }
+        return mutableMap
+    }
+
+    fun set(key: String, value: String): String? {
+        val valueKey = JumpConsistentHash.hash(key)
+        val serverKey = searchServerKeyByHash(valueKey)
+        buckets[serverKey]!!.sync().set(key, value)
+        hashTables[key] = valueKey
+        return value
+    }
+
+    fun get(key: String): String? {
         return command(key)?.get(key)
     }
 
     fun insert(host: String, port: Int): String {
-        val uri = "redis://${host}:${port}/0"
-        val key = calculateHash(uri).toString()
-        if (servers.keys.contains(key)) {
-            try {
-                servers[key]?.sync()?.ping()
-            } catch (e: Exception) {
-                servers.remove(key)
-                return "unknown"
+        val uri = makeUri(host, port)
+        for (i in 1..weight) {
+            thread {
+                val key = JumpConsistentHash.hash("${uri}-${i}")
+                if (!buckets.keys.contains(key)) {
+                    val connection = RedisClient.create(uri).connect()
+                    connection.timeout = Duration.ofSeconds(3)
+                    connection.sync()?.ping()
+
+                    buckets[key] = connection
+                    var targetIdx = buckets.keys.indexOf(key)
+                    if (targetIdx < 0) {
+                        targetIdx = 0
+                    }
+                    var sourceIdx = targetIdx + 1
+                    if (sourceIdx >= buckets.keys.size) {
+                        sourceIdx = 0
+                    }
+                    if (sourceIdx == targetIdx) {
+                        return@thread
+                    }
+                    val targetServer = buckets[key]?.sync()
+                    val sourceServer = buckets[buckets.keys.elementAt(sourceIdx)]?.sync()
+                    // remove key from buckets first
+                    // find values
+                    val move = hashTables.filter { key - it.value!! > 0 }
+                    move.keys.forEach { _key ->
+                        val _value = sourceServer?.get(_key)
+                        targetServer?.set(_key, _value)
+                    }
+                }
             }
-            return "exist"
-        }
-        try {
-            val connection = RedisClient.create(uri).connect()
-            connection.timeout = Duration.ofSeconds(3)
-            connection.sync()?.ping()
-            servers[key] = connection
-            degreeTables[key] = calculateDegree(key)
-        } catch (e: Exception) {
-            return "unknown"
         }
         return "insert"
     }
 
     fun delete(host: String, port: Int): String {
-        val uri = "redis://${host}:${port}/0"
-        val key = calculateHash(uri).toString()
-        if (!servers.keys.contains(key)) {
-            return "unknown"
+        val uri = makeUri(host, port)
+        for (i in 1..weight) {
+            thread {
+                val key = JumpConsistentHash.hash("${uri}-${i}") // serverKey
+                var sourceIdx = buckets.keys.indexOf(key)
+                if (sourceIdx < 0) {
+                    sourceIdx = 0
+                }
+                var targetIdx = sourceIdx + 1
+                if (targetIdx >= buckets.keys.size) {
+                    targetIdx = 0
+                }
+                if (sourceIdx == targetIdx) {
+                    return@thread
+                }
+                val sourceServer = buckets[key]
+                val targetServer = buckets[buckets.keys.elementAt(targetIdx)]?.sync()
+                // remove key from buckets first
+                // find values
+                val move = hashTables.filter { key - it.value!! > 0 }
+                move.keys.forEach { _key ->
+                    val _value = sourceServer?.sync()?.get(_key)
+                    targetServer?.set(_key, _value)
+                }
+                sourceServer?.close()
+                buckets.remove(key)
+            }
+            // get current serverKey
+            // get all keys of bucket
+            // copy data
+            // copy bucket to lower
+            // remove
         }
-        servers[key]?.close()
-        servers.remove(key)
+
         return "delete"
     }
 
@@ -61,21 +130,24 @@ class RedisClusterManager {
         return abs(key.hashCode().toLong())
     }
 
-    fun calculateDegree(key: String): Float {
-        return calculateHash(key) % 360.0f
+    fun makeUri(host: String, port: Int): String {
+        return "redis://${host}:${port}/0"
     }
 
-    fun calculateDegree(hash: Long): Float {
-        return hash % 360.0f
+    fun searchServerKey(key: String): Int {
+        val valueKey = JumpConsistentHash.hash(key)
+        return searchServerKeyByHash(valueKey)
     }
 
-    fun searchServerKey(key: String): String? {
-        val degree = calculateDegree(key)
-        return servers.keys.find { k -> calculateDegree(calculateHash(k)) < degree }
+    fun searchServerKeyByHash(hash: Int): Int {
+        val keys = buckets.keys
+        return keys.find { _key ->
+            _key - hash > 0
+        } ?: keys.first()
     }
 
     fun command(key: String): RedisCommands<String, String>? {
         val serverKey = searchServerKey(key)
-        return servers[serverKey]?.sync()
+        return buckets[serverKey]!!.sync()
     }
 }

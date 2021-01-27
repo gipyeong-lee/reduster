@@ -31,6 +31,8 @@ dependencies {
 	implementation("com.fasterxml.jackson.core:jackson-databind:2.11.3")
 	implementation("com.fasterxml.jackson.core:jackson-core:2.11.3")
 
+	implementation ("com.google.guava:guava:30.0-jre")
+
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 	annotationProcessor("org.projectlombok:lombok")
