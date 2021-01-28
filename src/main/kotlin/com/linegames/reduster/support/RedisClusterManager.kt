@@ -4,6 +4,7 @@ import com.google.common.collect.Ordering
 import com.linegames.reduster.domain.ValueComparableMap
 import com.linegames.reduster.util.JumpConsistentHash
 import io.lettuce.core.RedisClient
+import io.lettuce.core.RedisURI
 import io.lettuce.core.api.StatefulRedisConnection
 import io.lettuce.core.api.sync.RedisCommands
 import org.springframework.stereotype.Component
@@ -57,7 +58,8 @@ class RedisClusterManager {
             thread {
                 val key = JumpConsistentHash.hash("${uri}-${i}")
                 if (!buckets.keys.contains(key)) {
-                    val connection = RedisClient.create(uri).connect()
+
+                    val connection = RedisClient.create(RedisURI.create(host,port)).connect()
                     connection.timeout = Duration.ofSeconds(3)
                     connection.sync()?.ping()
 
@@ -131,7 +133,7 @@ class RedisClusterManager {
     }
 
     fun makeUri(host: String, port: Int): String {
-        return "redis://${host}:${port}/0"
+        return "redis://${host}:${port}"
     }
 
     fun searchServerKey(key: String): Int {
