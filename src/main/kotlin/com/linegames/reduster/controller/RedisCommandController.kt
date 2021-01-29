@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/redis/cmd")
+@CrossOrigin(origins = ["*"])
 class RedisCommandController(val redisClusterManager: RedisClusterManager) {
     @GetMapping(
         "/get/{key}",

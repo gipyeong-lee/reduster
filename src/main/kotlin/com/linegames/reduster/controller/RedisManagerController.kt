@@ -7,7 +7,9 @@ import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
 
 @RestController
+@CrossOrigin(origins = ["*"])
 class RedisManagerController(val redisClusterManager: RedisClusterManager) {
+
     @PostMapping(
         "/api/v1/redis/server",
         consumes = [MediaType.APPLICATION_JSON_VALUE],
@@ -61,7 +63,8 @@ class RedisManagerController(val redisClusterManager: RedisClusterManager) {
     fun allKeysInfo(): HashKeyResponse {
         val result = mutableListOf<HashKey>()
         redisClusterManager.hashTables.entries.forEach { hash ->
-            result.add(HashKey(hash.key, hash.value!!))
+
+            result.add(HashKey(hash.key, hash.value!!, redisClusterManager.searchServerKeyByHash(hash.value!!)))
         }
         return HashKeyResponse(result)
     }
