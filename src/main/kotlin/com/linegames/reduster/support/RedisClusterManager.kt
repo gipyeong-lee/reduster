@@ -54,12 +54,12 @@ class RedisClusterManager {
 
     fun insert(host: String, port: Int): String {
         val uri = makeUri(host, port)
+        var list: MutableList<Thread> = mutableListOf()
         for (i in 1..weight) {
-            thread {
+            val thread = thread {
                 val key = JumpConsistentHash.hash("${uri}-${i}")
                 if (!buckets.keys.contains(key)) {
-
-                    val connection = RedisClient.create(RedisURI.create(host,port)).connect()
+                    val connection = RedisClient.create(RedisURI.create(host, port)).connect()
                     connection.timeout = Duration.ofSeconds(3)
                     connection.sync()?.ping()
 
@@ -86,14 +86,19 @@ class RedisClusterManager {
                     }
                 }
             }
+            list.add(thread)
+        }
+        list.map {
+            it.join()
         }
         return "insert"
     }
 
     fun delete(host: String, port: Int): String {
         val uri = makeUri(host, port)
+        var list: MutableList<Thread> = mutableListOf()
         for (i in 1..weight) {
-            thread {
+            val thread = thread {
                 val key = JumpConsistentHash.hash("${uri}-${i}") // serverKey
                 var sourceIdx = buckets.keys.indexOf(key)
                 if (sourceIdx < 0) {
@@ -118,13 +123,9 @@ class RedisClusterManager {
                 sourceServer?.close()
                 buckets.remove(key)
             }
-            // get current serverKey
-            // get all keys of bucket
-            // copy data
-            // copy bucket to lower
-            // remove
+            list.add(thread)
         }
-
+        list.map { it.join() }
         return "delete"
     }
 

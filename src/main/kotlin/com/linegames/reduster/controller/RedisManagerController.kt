@@ -49,7 +49,6 @@ class RedisManagerController(val redisClusterManager: RedisClusterManager) {
         val result = mutableListOf<Bucket>()
         val regex = "tcp_port:[0-9]+".toRegex(RegexOption.MULTILINE)
         redisClusterManager.buckets.entries.forEach { bucket ->
-
             result.add(Bucket(bucket.key,
                 regex.find(bucket.value.sync().info("server"))?.value ?: ""))
         }
