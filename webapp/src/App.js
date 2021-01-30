@@ -1,9 +1,22 @@
 import './App.css';
 import {memo, useEffect, useState} from "react";
-import {Container, Form, Grid} from "semantic-ui-react";
+import {Container,Label, Form, Grid} from "semantic-ui-react";
 import axios from "axios";
 import NodeChart from "./components/NodeChart";
-
+export const colors = [
+    'red',
+    'orange',
+    'olive',
+    'green',
+    'teal',
+    'blue',
+    'violet',
+    'purple',
+    'pink',
+    'brown',
+    'grey',
+    'black',
+]
 function App() {
     const [state, setState] = useState({
         buckets: [], items: [], counter: {}, isInit: false
@@ -11,11 +24,12 @@ function App() {
 
     const [server, setServer] = useState({host: '127.0.0.1', port: '6379'})
     const [data, setData] = useState({})
-    const {buckets, items, counter, isInit} = state
+    const {buckets, counter, isInit} = state
 
     useEffect(() => {
-        if (isInit === false)
+        if (isInit === false) {
             loadBuckets(state, setState)
+        }
     }, [isInit])
 
     function handleAddServer() {
@@ -37,7 +51,7 @@ function App() {
     function handleAddData() {
         addData(data, state, setState)
     }
-
+    const uniqueBucket = [...new Set(buckets.map((bucket)=>bucket.info))]
     return (
         <Container textAlign={'center'}>
             <Grid centered>
@@ -92,6 +106,15 @@ function App() {
                     </Grid.Column>
                 </Grid.Row>
                 <Grid.Row columns={12}>
+                    <Grid.Column width={12}>
+                        {uniqueBucket.map((info,idx)=>{
+                            return <Label color={colors[idx]}>
+                                {info}
+                            </Label>
+                        })}
+                    </Grid.Column>
+                </Grid.Row>
+                <Grid.Row columns={12}>
                     <Grid.Column width={12} textAlign={'center'}>
                         {buckets.length > 0 ? <NodeChart buckets={buckets} counter={counter}/>
                             : ''}
@@ -106,10 +129,12 @@ async function loadBuckets(state, setState) {
     const bucketResponse = await axios.get("http://localhost:8080/api/v1/redis/server/info/all")
     const itemResponse = await axios.get("http://localhost:8080/api/v1/redis/keys/info/all")
     const counter = makeCounter(itemResponse.data.keys)
+    const uniqueBucket = [...new Set(bucketResponse.data.buckets.map((bucket)=>bucket.info))]
     setState({
         ...state, ...{
             buckets: bucketResponse.data.buckets.map((bucket) => {
-                bucket.color = `#${Math.floor(bucket.info * 16777215).toString(16)}`
+                const colorIndex = uniqueBucket.indexOf(bucket.info)
+                bucket.color = colors[colorIndex]
                 return bucket
             }),
             items: itemResponse.data.keys,
@@ -117,6 +142,9 @@ async function loadBuckets(state, setState) {
             isInit: true
         }
     })
+    setTimeout(()=>{
+        loadBuckets(state, setState)
+    },5000)
 }
 
 function makeCounter(items) {

@@ -1,9 +1,10 @@
 import {VictoryLabel, VictoryTheme} from "victory-core";
-import {VictoryBar, VictoryChart, VictoryPolarAxis} from "victory";
+import {VictoryBar, VictoryChart, VictoryPolarAxis, VictoryTooltip} from "victory";
 import {memo} from "react";
 
 const NodeChart = (props) => {
     const {buckets, counter} = props
+    const max = Math.max.apply(Math, Object.keys(counter).map(function(key) { return counter[key]; }))
     return <VictoryChart polar
                          theme={VictoryTheme.material}
     >
@@ -32,7 +33,7 @@ const NodeChart = (props) => {
                                           }
                                       }}
                                       animate={{
-                                          duration: 1000,
+                                          duration: 200,
                                           easing: "bounce"
                                       }}
                                       axisValue={`${bucket.hashKey}`}
@@ -41,11 +42,18 @@ const NodeChart = (props) => {
             })
         }
         <VictoryBar
-            style={{data: {fill: "tomato", width: 10}, labels: {fill: "black"}}}
-            animate={{
-                duration: 500,
-                easing: "bounce"
-            }}
+            style={
+                {
+                    data: {
+                        fill: "tomato",opacity: ({ datum }) => datum.y/max, width: 10, fontcolor: 'white'
+                    },
+                    labels: {
+                        fill: "black", fontSize: 4
+                    }
+                }
+            }
+            labelComponent={<VictoryTooltip/>}
+            labels={({datum}) => datum.y}
             data={
                 buckets.map((bucket) => {
                     const serverKey = `${bucket.hashKey}`
