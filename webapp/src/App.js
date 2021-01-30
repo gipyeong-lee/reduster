@@ -2,15 +2,15 @@ import './App.css';
 import {memo, useEffect, useState} from "react";
 import {Container, Form, Grid} from "semantic-ui-react";
 import axios from "axios";
-import {VictoryBar, VictoryChart, VictoryPolarAxis} from 'victory';
-import {VictoryTheme} from "victory-core";
+import NodeChart from "./components/NodeChart";
 
 function App() {
     const [state, setState] = useState({
-        buckets: [], items: [], counter: {}, isInit: true
+        buckets: [], items: [], counter: {}, isInit: false
     })
-    const [server, setServer] = useState({host: '127.0.0.1', port: '6379'})
 
+    const [server, setServer] = useState({host: '127.0.0.1', port: '6379'})
+    const [data, setData] = useState({})
     const {buckets, items, counter, isInit} = state
 
     useEffect(() => {
@@ -29,12 +29,20 @@ function App() {
     function inputChange(event) {
         setServer({...server, ...{[event.target.name]: event.target.value}})
     }
-    console.log(state)
+
+    function inputChangeData(event) {
+        setData({...data, ...{[event.target.name]: event.target.value}})
+    }
+
+    function handleAddData() {
+        addData(data, state, setState)
+    }
+
     return (
         <Container textAlign={'center'}>
             <Grid centered>
                 <Grid.Row columns={12}>
-                    <Grid.Column width={8}>
+                    <Grid.Column width={12}>
                         <Form>
                             <Form.Group>
                                 <Form.Input
@@ -55,42 +63,38 @@ function App() {
                                 />
                                 <Form.Button content={'Add'} onClick={handleAddServer}/>
                                 <Form.Button content={'remove'} color={'red'} onClick={handleRemoveServer}/>
+
                             </Form.Group>
                         </Form>
                     </Grid.Column>
-                    <Grid.Column width={3}>
-
+                    <Grid.Column width={12}>
+                        <Form>
+                            <Form.Group>
+                                <Form.Input
+                                    onChange={(event) => {
+                                        inputChangeData(event)
+                                    }}
+                                    name={'key'}
+                                    placeholder='key'
+                                    defaultValue={data.key}
+                                />
+                                <Form.Input
+                                    onChange={(event) => {
+                                        inputChangeData(event)
+                                    }}
+                                    name={'value'}
+                                    placeholder='value'
+                                    defaultValue={data.value}
+                                />
+                                <Form.Button content={'Add'} onClick={handleAddData}/>
+                            </Form.Group>
+                        </Form>
                     </Grid.Column>
                 </Grid.Row>
                 <Grid.Row columns={12}>
                     <Grid.Column width={12} textAlign={'center'}>
-                        {buckets.length > 0 ?
-                            <VictoryChart polar
-                                          theme={VictoryTheme.material}
-                            >
-                                {
-                                    buckets.map((bucket, i) => {
-                                        return (
-                                            <VictoryPolarAxis dependentAxis
-                                                              key={i}
-                                                              label={`${bucket.hashKey}`}
-                                                              labelPlacement="perpendicular"
-                                                              style={{tickLabels: {fill: "none"}}}
-                                                              axisValue={`${bucket.hashKey}`}
-                                            />
-                                        );
-                                    })
-                                }
-                                <VictoryBar
-                                    style={{data: {fill: "tomato", width: 25}}}
-                                    data={
-                                        buckets.map((bucket) => {
-                                            const serverKey = `${bucket.hashKey}`
-                                            return {x: serverKey, y: counter[serverKey] || 0}
-                                        })
-                                    }
-                                />
-                            </VictoryChart> : ''}
+                        {buckets.length > 0 ? <NodeChart buckets={buckets} counter={counter}/>
+                            : ''}
                     </Grid.Column>
                 </Grid.Row>
             </Grid>
@@ -102,10 +106,12 @@ async function loadBuckets(state, setState) {
     const bucketResponse = await axios.get("http://localhost:8080/api/v1/redis/server/info/all")
     const itemResponse = await axios.get("http://localhost:8080/api/v1/redis/keys/info/all")
     const counter = makeCounter(itemResponse.data.keys)
-    console.log(bucketResponse.data.buckets)
     setState({
         ...state, ...{
-            buckets: bucketResponse.data.buckets,
+            buckets: bucketResponse.data.buckets.map((bucket) => {
+                bucket.color = `#${Math.floor(bucket.info * 16777215).toString(16)}`
+                return bucket
+            }),
             items: itemResponse.data.keys,
             counter: counter,
             isInit: true
@@ -126,15 +132,19 @@ function makeCounter(items) {
     return nextCounter
 }
 
+function addData(data, state, setState) {
+    axios.put(`http://localhost:8080/api/v1/redis/cmd/set/${encodeURI(data.key)}/${encodeURI(data.value)}`).then(() => {
+        setState({...state, ...{isInit: false}})
+    })
+}
+
 function addServer(server, state, setState) {
-    console.log('addServer', server)
     axios.post("http://localhost:8080/api/v1/redis/server", server).then(() => {
         setState({...state, ...{isInit: false}})
     })
 }
 
 function removeServer(server, state, setState) {
-    console.log('removeServer', server)
     axios.delete("http://localhost:8080/api/v1/redis/server", {data: server}).then(() => {
         setState({...state, ...{isInit: false}})
     })

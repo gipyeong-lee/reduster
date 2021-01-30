@@ -120,12 +120,20 @@ class RedisClusterManager {
                     val _value = sourceServer?.sync()?.get(_key)
                     targetServer?.set(_key, _value)
                 }
-                sourceServer?.close()
-                buckets.remove(key)
+                if(key != 1){
+                    buckets.remove(key)
+                }
             }
             list.add(thread)
         }
-        list.map { it.join() }
+        list.map {
+            it.join()
+        }
+        // close after all keys moved.
+        val key = JumpConsistentHash.hash("${uri}-1") // serverKey
+        buckets[key]?.close()
+        buckets.remove(key)
+
         return "delete"
     }
 
