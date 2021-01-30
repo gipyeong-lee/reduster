@@ -22,13 +22,25 @@ Redis : 3.0.5
 
 - 분산 방법은 client-side에서 미리 세팅된 redis node 4개에 consistent hashing을 이용
 - 이후에 확장을 통해 다른 스토리지를 이용 할 수 있도록 공통 interface를 구현
-- Scale-out, scale-in 고려
+- Scale-out, scale-in 고려 
 - 1-10만개 의 아이템을 입력/읽기를 하는 tc를 작성
-- 성능테스트까지 수행
 
 # Overview
 
 ## Jumping Consistent Hash Algorithm
 
 - 참고한 알고리즘 논문 : https://arxiv.org/pdf/1406.2294.pdf
+
+## How to test this project.
+
+#### 1. startup redis container
+```
+./start_redis.sh
+```
+
+#### 2. run webapp
+```
+cd webapp
+yarn install && yarn start
+``` 
 
