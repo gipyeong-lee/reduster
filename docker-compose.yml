@@ -1,0 +1,18 @@
+version: "3.7"
+services:
+  redis-a:
+    image: redis:3.0.5
+    ports:
+      - 6379:6379
+  redis-b:
+    image: redis:3.0.5
+    ports:
+      - 6380:6379
+  redis-c:
+    image: redis:3.0.5
+    ports:
+      - 6381:6379
+  redis-d:
+    image: redis:3.0.5
+    ports:
+      - 6382:6379
