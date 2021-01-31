@@ -1,4 +1,4 @@
-package com.linegames.reduster.domain
+package com.indiemove.reduster.domain
 
 import com.google.common.base.Functions
 import com.google.common.collect.Ordering

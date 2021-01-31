@@ -1,4 +1,4 @@
-package com.linegames.reduster.domain
+package com.indiemove.reduster.domain
 
 data class ApiResponse(val message: String, val body: Any?)
 data class CommandResponse(val server: Int, val value: String?)

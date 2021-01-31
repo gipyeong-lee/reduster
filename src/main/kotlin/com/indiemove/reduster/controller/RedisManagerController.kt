@@ -1,8 +1,9 @@
-package com.linegames.reduster.controller
+package com.indiemove.reduster.controller
 
+import com.indiemove.reduster.domain.*
 import com.linegames.reduster.domain.*
-import com.linegames.reduster.support.RedisClusterManager
-import com.linegames.reduster.util.JumpConsistentHash
+import com.indiemove.reduster.support.RedisClusterManager
+import com.indiemove.reduster.util.JumpConsistentHash
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
 
@@ -49,8 +50,10 @@ class RedisManagerController(val redisClusterManager: RedisClusterManager) {
         val result = mutableListOf<Bucket>()
         val regex = "tcp_port:[0-9]+".toRegex(RegexOption.MULTILINE)
         redisClusterManager.buckets.entries.forEach { bucket ->
-            result.add(Bucket(bucket.key,
-                regex.find(bucket.value.sync().info("server"))?.value ?: ""))
+            result.add(
+                Bucket(bucket.key,
+                regex.find(bucket.value.sync().info("server"))?.value ?: "")
+            )
         }
         return BucketResponse(result)
     }

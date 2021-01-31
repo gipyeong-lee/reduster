@@ -1,4 +1,4 @@
-package com.linegames.reduster
+package com.indiemove.reduster
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

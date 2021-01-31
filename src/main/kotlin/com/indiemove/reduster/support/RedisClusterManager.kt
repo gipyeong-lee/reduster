@@ -1,8 +1,8 @@
-package com.linegames.reduster.support
+package com.indiemove.reduster.support
 
 import com.google.common.collect.Ordering
-import com.linegames.reduster.domain.ValueComparableMap
-import com.linegames.reduster.util.JumpConsistentHash
+import com.indiemove.reduster.domain.ValueComparableMap
+import com.indiemove.reduster.util.JumpConsistentHash
 import io.lettuce.core.RedisClient
 import io.lettuce.core.RedisURI
 import io.lettuce.core.api.StatefulRedisConnection

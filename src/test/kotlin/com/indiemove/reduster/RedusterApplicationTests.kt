@@ -1,4 +1,4 @@
-package com.linegames.reduster
+package com.indiemove.reduster
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest

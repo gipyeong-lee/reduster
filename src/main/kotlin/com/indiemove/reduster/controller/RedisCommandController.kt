@@ -1,9 +1,9 @@
-package com.linegames.reduster.controller
+package com.indiemove.reduster.controller
 
-import com.linegames.reduster.domain.ApiResponse
-import com.linegames.reduster.domain.CommandResponse
-import com.linegames.reduster.support.RedisClusterManager
-import com.linegames.reduster.util.JumpConsistentHash
+import com.indiemove.reduster.domain.ApiResponse
+import com.indiemove.reduster.domain.CommandResponse
+import com.indiemove.reduster.support.RedisClusterManager
+import com.indiemove.reduster.util.JumpConsistentHash
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
 

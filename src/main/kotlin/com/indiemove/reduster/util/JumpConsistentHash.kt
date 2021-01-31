@@ -1,4 +1,4 @@
-package com.linegames.reduster.util
+package com.indiemove.reduster.util
 
 import org.springframework.stereotype.Component
 
