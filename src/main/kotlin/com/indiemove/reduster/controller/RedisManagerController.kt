@@ -1,7 +1,6 @@
 package com.indiemove.reduster.controller
 
 import com.indiemove.reduster.domain.*
-import com.linegames.reduster.domain.*
 import com.indiemove.reduster.support.RedisClusterManager
 import com.indiemove.reduster.util.JumpConsistentHash
 import org.springframework.http.MediaType
