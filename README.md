@@ -39,6 +39,15 @@ Redis : 3.0.5
 ./start_redis.sh
 ```
 
+또는 docker-compose가 설치되어 있을 경우 아래와 같이 실행도 가능합니다.
+```bash
+# run docker services as daemon
+docker-compose up -d
+
+# down
+docker-compose down
+```
+
 #### 2. run webapp
 ```
 cd webapp
