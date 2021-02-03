@@ -12,8 +12,6 @@ import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.ConcurrentSkipListMap
-import java.util.stream.Collectors
-import kotlin.concurrent.thread
 import kotlin.math.abs
 
 @Component
@@ -36,7 +34,7 @@ class RedisClusterManager : IClusterManager {
         commander.entries.forEach { (serverKey, data) ->
             buckets[serverKey]!!.sync().mset(data)
         }
-//        buckets[serverKey]!!.sync().set(key, value)
+
         return map
     }
 
@@ -93,10 +91,9 @@ class RedisClusterManager : IClusterManager {
                 var sourceServerKey = buckets.keys.elementAt(sourceIdx)
                 val targetServer = buckets[key]?.sync()
                 val sourceServer = buckets[sourceServerKey]?.sync()
-
                 val move = hashTables.filter { key - it.value!! > 0 }
-                val targetData = mutableMapOf<String,String>()
-                if(move.isNotEmpty()){
+                val targetData = mutableMapOf<String, String>()
+                if (move.isNotEmpty()) {
                     sourceServer?.mget(*move.keys.toTypedArray())?.forEach { data ->
                         targetData[data.key] = data.value
                     }
@@ -108,43 +105,36 @@ class RedisClusterManager : IClusterManager {
 
     override fun delete(host: String, port: Int) {
         val uri = makeUri(host, port)
-        var list = Collections.synchronizedList(mutableListOf<Thread>())
         for (i in 1..weight) {
-            val thread = thread {
-                val key = JumpConsistentHash.hash("${uri}-${i}") // serverKey
-                var sourceIdx = buckets.keys.indexOf(key)
-                if (sourceIdx < 0) {
-                    sourceIdx = 0
-                }
-                var targetIdx = sourceIdx + 1
-                if (targetIdx >= buckets.keys.size) {
-                    targetIdx = 0
-                }
-                if (sourceIdx == targetIdx) {
-                    return@thread
-                }
-                val sourceServer = buckets[key]
-                val targetServer = buckets[buckets.keys.elementAt(targetIdx)]?.sync()
-                val move = hashTables.filter { key - it.value!! > 0 }
+            val key = JumpConsistentHash.hash("${uri}-${i}") // serverKey
+            var sourceIdx = buckets.keys.indexOf(key)
+            if (sourceIdx < 0) {
+                sourceIdx = 0
+            }
+            var targetIdx = sourceIdx + 1
+            if (targetIdx >= buckets.keys.size) {
+                targetIdx = 0
+            }
+            if (sourceIdx == targetIdx) {
+                continue
+            }
+            val sourceServer = buckets[key]
+            val targetServer = buckets[buckets.keys.elementAt(targetIdx)]?.sync()
+            val move = hashTables.filter { key - it.value!! > 0 }
 
-                if(move.isNotEmpty()) {
-                    val targetData = mutableMapOf<String, String>()
-                    sourceServer?.sync()?.mget(*move.keys.toTypedArray())?.forEach { data ->
+            if (move.isNotEmpty()) {
+                val targetData = mutableMapOf<String, String>()
+                sourceServer?.sync()?.mget(*move.keys.toTypedArray())?.filter { data -> data.hasValue() }
+                    ?.forEach { data ->
                         targetData[data.key] = data.value
                     }
-                    targetServer?.mset(targetData)
-                }
-                if (key != 1) {
-                    buckets.remove(key)
-                }
+                targetServer?.mset(targetData)
             }
-            list.add(thread)
+            if (i != 1) {
+                buckets.remove(key)
+            }
         }
-        list.map {
-            it.join()
-        }
-        // close after all keys moved.
-        val key = JumpConsistentHash.hash("${uri}-1") // serverKey
+        val key = JumpConsistentHash.hash("${uri}-${1}") // serverKey
         buckets[key]?.close()
         buckets.remove(key)
     }
