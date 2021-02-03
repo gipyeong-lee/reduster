@@ -1,8 +1,9 @@
 import './App.css';
 import {memo, useEffect, useState} from "react";
-import {Container,Label, Form, Grid} from "semantic-ui-react";
-import axios from "axios";
+import {Container, Form, Grid, Input, Label, Button} from "semantic-ui-react";
 import NodeChart from "./components/NodeChart";
+import axios from "axios";
+
 export const colors = [
     'red',
     'orange',
@@ -17,6 +18,7 @@ export const colors = [
     'grey',
     'black',
 ]
+
 function App() {
     const [state, setState] = useState({
         buckets: [], items: [], counter: {}, isInit: false
@@ -25,7 +27,11 @@ function App() {
     const [server, setServer] = useState({host: '127.0.0.1', port: '6379'})
     const [data, setData] = useState({})
     const {buckets, counter, isInit} = state
-
+    useEffect(()=>{
+        setInterval(()=>{
+            loadBuckets(state, setState)
+        }, 5000)
+    },[])
     useEffect(() => {
         if (isInit === false) {
             loadBuckets(state, setState)
@@ -51,64 +57,82 @@ function App() {
     function handleAddData() {
         addData(data, state, setState)
     }
-    const uniqueBucket = [...new Set(buckets.map((bucket)=>bucket.info))]
+
+    const uniqueBucket = [...new Set(buckets.map((bucket) => bucket.info))]
     return (
         <Container textAlign={'center'}>
             <Grid centered>
                 <Grid.Row columns={12}>
                     <Grid.Column width={12}>
                         <Form>
-                            <Form.Group>
-                                <Form.Input
-                                    onChange={(event) => {
-                                        inputChange(event)
-                                    }}
-                                    name={'host'}
-                                    placeholder='127.0.0.1'
-                                    defaultValue={server.host}
-                                />
-                                <Form.Input
-                                    onChange={(event) => {
-                                        inputChange(event)
-                                    }}
-                                    name={'port'}
-                                    placeholder='6379'
-                                    defaultValue={server.port}
-                                />
-                                <Form.Button content={'Add'} onClick={handleAddServer}/>
-                                <Form.Button content={'remove'} color={'red'} onClick={handleRemoveServer}/>
-
-                            </Form.Group>
-                        </Form>
-                    </Grid.Column>
-                    <Grid.Column width={12}>
-                        <Form>
-                            <Form.Group>
-                                <Form.Input
-                                    onChange={(event) => {
-                                        inputChangeData(event)
-                                    }}
-                                    name={'key'}
-                                    placeholder='key'
-                                    defaultValue={data.key}
-                                />
-                                <Form.Input
-                                    onChange={(event) => {
-                                        inputChangeData(event)
-                                    }}
-                                    name={'value'}
-                                    placeholder='value'
-                                    defaultValue={data.value}
-                                />
-                                <Form.Button content={'Add'} onClick={handleAddData}/>
+                            <Form.Group inline>
+                                <Form.Field>
+                                    <label>Redis Server</label>
+                                    <Input
+                                        onChange={(event) => {
+                                            inputChange(event)
+                                        }}
+                                        name={'host'}
+                                        placeholder='127.0.0.1'
+                                        defaultValue={server.host}
+                                    />
+                                </Form.Field>
+                                <Form.Field>
+                                    <Input
+                                        onChange={(event) => {
+                                            inputChange(event)
+                                        }}
+                                        name={'port'}
+                                        placeholder='6379'
+                                        defaultValue={server.port}
+                                    />
+                                </Form.Field>
+                                <Form.Field>
+                                    <Button content={'Add'} onClick={handleAddServer}/>
+                                </Form.Field>
+                                <Form.Field>
+                                    <Button content={'remove'} color={'red'} onClick={handleRemoveServer}/>
+                                </Form.Field>
                             </Form.Group>
                         </Form>
                     </Grid.Column>
                 </Grid.Row>
                 <Grid.Row columns={12}>
                     <Grid.Column width={12}>
-                        {uniqueBucket.map((info,idx)=>{
-                            return <Label color={colors[idx]}>
+                        <Form>
+                            <Form.Group inline>
+                                <Form.Field>
+                                    <label>SET Key / Value</label>
+                                    <Input
+                                        onChange={(event) => {
+                                            inputChangeData(event)
+                                        }}
+                                        name={'key'}
+                                        placeholder='key'
+                                        defaultValue={data.key}
+                                    />
+                                </Form.Field>
+                                <Form.Field>
+                                    <Input
+                                        onChange={(event) => {
+                                            inputChangeData(event)
+                                        }}
+                                        name={'value'}
+                                        placeholder='value'
+                                        defaultValue={data.value}
+                                    />
+                                </Form.Field>
+                                <Form.Field>
+                                    <Button content={'Add'} onClick={handleAddData}/>
+                                </Form.Field>
+                            </Form.Group>
+                        </Form>
+                    </Grid.Column>
+                </Grid.Row>
+                <Grid.Row columns={12}>
+                    <Grid.Column width={12}>
+                        {uniqueBucket.map((info, idx) => {
+                            return <Label key={`label_${idx}`} color={colors[idx]}>
                                 {info}
                             </Label>
                         })}
@@ -129,7 +153,7 @@ async function loadBuckets(state, setState) {
     const bucketResponse = await axios.get("http://localhost:8080/api/v1/redis/server/info/all")
     const itemResponse = await axios.get("http://localhost:8080/api/v1/redis/keys/info/all")
     const counter = makeCounter(itemResponse.data.keys)
-    const uniqueBucket = [...new Set(bucketResponse.data.buckets.map((bucket)=>bucket.info))]
+    const uniqueBucket = [...new Set(bucketResponse.data.buckets.map((bucket) => bucket.info))]
     setState({
         ...state, ...{
             buckets: bucketResponse.data.buckets.map((bucket) => {
@@ -142,9 +166,6 @@ async function loadBuckets(state, setState) {
             isInit: true
         }
     })
-    setTimeout(()=>{
-        loadBuckets(state, setState)
-    },5000)
 }
 
 function makeCounter(items) {
@@ -156,7 +177,6 @@ function makeCounter(items) {
             nextCounter[`${item.serverKey}`] += 1
         }
     })
-
     return nextCounter
 }
 
