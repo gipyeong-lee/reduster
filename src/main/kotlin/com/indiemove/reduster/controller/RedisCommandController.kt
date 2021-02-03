@@ -4,6 +4,7 @@ import com.indiemove.reduster.domain.ApiResponse
 import com.indiemove.reduster.domain.CommandResponse
 import com.indiemove.reduster.support.RedisClusterManager
 import com.indiemove.reduster.util.JumpConsistentHash
+import io.lettuce.core.KeyValue
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
 
@@ -35,7 +36,7 @@ class RedisCommandController(val redisClusterManager: RedisClusterManager) {
         "/mget/{keys}",
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
-    fun mget(@PathVariable keys: Set<String>): Map<String, String?> {
+    fun mget(@PathVariable keys: Set<String>): List<KeyValue<String, String>> {
         val value = redisClusterManager.mget(keys)
         return value
     }

@@ -19,6 +19,9 @@ configurations {
 
 repositories {
 	mavenCentral()
+	maven {
+		setUrl("https://dl.bintray.com/palantir/releases")
+	}
 }
 
 dependencies {
@@ -37,6 +40,7 @@ dependencies {
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 	annotationProcessor("org.projectlombok:lombok")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("com.palantir.docker.compose:docker-compose-rule-junit4:1.5.0")
 }
 
 tasks.withType<KotlinCompile> {

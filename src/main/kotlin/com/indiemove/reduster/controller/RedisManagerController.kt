@@ -16,8 +16,8 @@ class RedisManagerController(val redisClusterManager: RedisClusterManager) {
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun insertServer(@RequestBody body: InsertServerRequest): ApiResponse {
-        val result = redisClusterManager.insert(body.host, body.port)
-        return ApiResponse("$result Server", body = body)
+        redisClusterManager.insert(body.host, body.port)
+        return ApiResponse("Insert SERVER", body = body)
     }
 
     @DeleteMapping(
@@ -26,8 +26,8 @@ class RedisManagerController(val redisClusterManager: RedisClusterManager) {
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun removeServer(@RequestBody body: InsertServerRequest): ApiResponse {
-        val result = redisClusterManager.delete(body.host, body.port)
-        return ApiResponse("$result Server", body = body)
+        redisClusterManager.delete(body.host, body.port)
+        return ApiResponse("Remove Server", body = body)
     }
 
     @PostMapping(

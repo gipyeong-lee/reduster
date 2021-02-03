@@ -3,6 +3,7 @@ package com.indiemove.reduster.support
 import com.google.common.collect.Ordering
 import com.indiemove.reduster.domain.ValueComparableMap
 import com.indiemove.reduster.util.JumpConsistentHash
+import io.lettuce.core.KeyValue
 import io.lettuce.core.RedisClient
 import io.lettuce.core.RedisURI
 import io.lettuce.core.api.StatefulRedisConnection
@@ -11,36 +12,52 @@ import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.ConcurrentSkipListMap
+import java.util.stream.Collectors
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
 @Component
-class RedisClusterManager {
+class RedisClusterManager : IClusterManager {
     var hashTables: ValueComparableMap<String, Int> = ValueComparableMap(Ordering.natural())
     var buckets: ConcurrentSkipListMap<Int, StatefulRedisConnection<String, String>> =
         ConcurrentSkipListMap(Comparator.naturalOrder())
     var weight: Int = 10
-    fun mset(map: Map<String, String>): Map<String, String> {
-        map.keys.forEach { key ->
+    override fun mset(map: Map<String, String>): Map<String, String> {
+        val commander = ConcurrentSkipListMap<Int, MutableMap<String, String>>()
+        map.entries.forEach { (key, value) ->
             val valueKey = JumpConsistentHash.hash(key)
             val serverKey = searchServerKeyByHash(valueKey)
-            buckets[serverKey]!!.sync().set(key, map[key])
+            if (commander[serverKey] == null) {
+                commander[serverKey] = mutableMapOf()
+            }
+            commander[serverKey]?.put(key, value)
             hashTables[key] = valueKey
         }
+        commander.entries.forEach { (serverKey, data) ->
+            buckets[serverKey]!!.sync().mset(data)
+        }
+//        buckets[serverKey]!!.sync().set(key, value)
         return map
     }
 
-    fun mget(keys: Set<String>): Map<String, String?> {
-        var mutableMap = mutableMapOf<String, String?>()
+    override fun mget(keys: Set<String>): List<KeyValue<String, String>> {
+        var mutableList = Collections.synchronizedList(mutableListOf<KeyValue<String, String>>())
+        val commander = ConcurrentSkipListMap<Int, MutableSet<String>>()
         keys.forEach { key ->
             val valueKey = JumpConsistentHash.hash(key)
             val serverKey = searchServerKeyByHash(valueKey)
-            mutableMap[key] = buckets[serverKey]!!.sync().get(key)
+            if (commander[serverKey] == null) {
+                commander[serverKey] = mutableSetOf()
+            }
+            commander[serverKey]?.add(key)
         }
-        return mutableMap
+        commander.entries.forEach { (serverKey, keys) ->
+            mutableList.addAll(buckets[serverKey]!!.sync().mget(*keys.toTypedArray()))
+        }
+        return mutableList
     }
 
-    fun set(key: String, value: String): String? {
+    override fun set(key: String, value: String): String? {
         val valueKey = JumpConsistentHash.hash(key)
         val serverKey = searchServerKeyByHash(valueKey)
         buckets[serverKey]!!.sync().set(key, value)
@@ -48,55 +65,50 @@ class RedisClusterManager {
         return value
     }
 
-    fun get(key: String): String? {
+    override fun get(key: String): String? {
         return command(key)?.get(key)
     }
 
-    fun insert(host: String, port: Int): String {
+    override fun insert(host: String, port: Int) {
         val uri = makeUri(host, port)
-        var list: MutableList<Thread> = mutableListOf()
         for (i in 1..weight) {
-            val thread = thread {
-                val key = JumpConsistentHash.hash("${uri}-${i}")
-                if (!buckets.keys.contains(key)) {
-                    val connection = RedisClient.create(RedisURI.create(host, port)).connect()
-                    connection.timeout = Duration.ofSeconds(3)
-                    connection.sync()?.ping()
+            val key = JumpConsistentHash.hash("${uri}-${i}")
+            if (!buckets.keys.contains(key)) {
+                val connection = RedisClient.create(RedisURI.create(host, port)).connect()
+                connection.timeout = Duration.ofSeconds(3)
+                connection.sync()?.ping()
 
-                    buckets[key] = connection
-                    var targetIdx = buckets.keys.indexOf(key)
-                    if (targetIdx < 0) {
-                        targetIdx = 0
+                buckets[key] = connection
+                var targetIdx = buckets.keys.indexOf(key)
+                if (targetIdx < 0) {
+                    targetIdx = 0
+                }
+                var sourceIdx = targetIdx + 1
+                if (sourceIdx >= buckets.keys.size) {
+                    sourceIdx = 0
+                }
+                if (sourceIdx == targetIdx) {
+                    continue
+                }
+                var sourceServerKey = buckets.keys.elementAt(sourceIdx)
+                val targetServer = buckets[key]?.sync()
+                val sourceServer = buckets[sourceServerKey]?.sync()
+
+                val move = hashTables.filter { key - it.value!! > 0 }
+                val targetData = mutableMapOf<String,String>()
+                if(move.isNotEmpty()){
+                    sourceServer?.mget(*move.keys.toTypedArray())?.forEach { data ->
+                        targetData[data.key] = data.value
                     }
-                    var sourceIdx = targetIdx + 1
-                    if (sourceIdx >= buckets.keys.size) {
-                        sourceIdx = 0
-                    }
-                    if (sourceIdx == targetIdx) {
-                        return@thread
-                    }
-                    val targetServer = buckets[key]?.sync()
-                    val sourceServer = buckets[buckets.keys.elementAt(sourceIdx)]?.sync()
-                    // remove key from buckets first
-                    // find values
-                    val move = hashTables.filter { key - it.value!! > 0 }
-                    move.keys.forEach { _key ->
-                        val _value = sourceServer?.get(_key)
-                        targetServer?.set(_key, _value)
-                    }
+                    targetServer?.mset(targetData)
                 }
             }
-            list.add(thread)
         }
-        list.map {
-            it.join()
-        }
-        return "insert"
     }
 
-    fun delete(host: String, port: Int): String {
+    override fun delete(host: String, port: Int) {
         val uri = makeUri(host, port)
-        var list: MutableList<Thread> = mutableListOf()
+        var list = Collections.synchronizedList(mutableListOf<Thread>())
         for (i in 1..weight) {
             val thread = thread {
                 val key = JumpConsistentHash.hash("${uri}-${i}") // serverKey
@@ -113,14 +125,16 @@ class RedisClusterManager {
                 }
                 val sourceServer = buckets[key]
                 val targetServer = buckets[buckets.keys.elementAt(targetIdx)]?.sync()
-                // remove key from buckets first
-                // find values
                 val move = hashTables.filter { key - it.value!! > 0 }
-                move.keys.forEach { _key ->
-                    val _value = sourceServer?.sync()?.get(_key)
-                    targetServer?.set(_key, _value)
+
+                if(move.isNotEmpty()) {
+                    val targetData = mutableMapOf<String, String>()
+                    sourceServer?.sync()?.mget(*move.keys.toTypedArray())?.forEach { data ->
+                        targetData[data.key] = data.value
+                    }
+                    targetServer?.mset(targetData)
                 }
-                if(key != 1){
+                if (key != 1) {
                     buckets.remove(key)
                 }
             }
@@ -133,8 +147,6 @@ class RedisClusterManager {
         val key = JumpConsistentHash.hash("${uri}-1") // serverKey
         buckets[key]?.close()
         buckets.remove(key)
-
-        return "delete"
     }
 
     fun calculateHash(key: String): Long {

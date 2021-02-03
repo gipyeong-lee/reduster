@@ -27,7 +27,11 @@ function App() {
     const [server, setServer] = useState({host: '127.0.0.1', port: '6379'})
     const [data, setData] = useState({})
     const {buckets, counter, isInit} = state
-
+    useEffect(()=>{
+        setInterval(()=>{
+            loadBuckets(state, setState)
+        }, 5000)
+    },[])
     useEffect(() => {
         if (isInit === false) {
             loadBuckets(state, setState)
@@ -128,7 +132,7 @@ function App() {
                 <Grid.Row columns={12}>
                     <Grid.Column width={12}>
                         {uniqueBucket.map((info, idx) => {
-                            return <Label color={colors[idx]}>
+                            return <Label key={`label_${idx}`} color={colors[idx]}>
                                 {info}
                             </Label>
                         })}
@@ -162,9 +166,6 @@ async function loadBuckets(state, setState) {
             isInit: true
         }
     })
-    setTimeout(() => {
-        loadBuckets(state, setState)
-    }, 5000)
 }
 
 function makeCounter(items) {
@@ -176,7 +177,6 @@ function makeCounter(items) {
             nextCounter[`${item.serverKey}`] += 1
         }
     })
-
     return nextCounter
 }
 
