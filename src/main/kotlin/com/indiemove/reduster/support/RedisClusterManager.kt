@@ -15,11 +15,8 @@ import java.util.concurrent.ConcurrentSkipListMap
 import kotlin.math.abs
 
 @Component
-class RedisClusterManager : IClusterManager {
-    var hashTables: ValueComparableMap<String, Int> = ValueComparableMap(Ordering.natural())
-    var buckets: ConcurrentSkipListMap<Int, StatefulRedisConnection<String, String>> =
-        ConcurrentSkipListMap(Comparator.naturalOrder())
-    var weight: Int = 10
+class RedisClusterManager : AbstractClusterManager<StatefulRedisConnection<String,String>>() {
+
     override fun mset(map: Map<String, String>): Map<String, String> {
         val commander = ConcurrentSkipListMap<Int, MutableMap<String, String>>()
         map.entries.forEach { (key, value) ->
