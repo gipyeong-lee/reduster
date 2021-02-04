@@ -29,10 +29,10 @@ jobs:
           java-version: 1.8
       - name: Build with Gradle
         run: ./gradlew assemble
-      - run: mkdir staging && cp target/*.jar staging
+      - run: pwd
       # Runs a single command using the runners shell
       - name: Run java
-        run: java -jar reduster.jar
+        run: java -jar ./build/libs/reduster.jar
         working-directory: staging
         
       # Runs a set of commands using the runners shell
