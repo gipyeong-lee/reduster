@@ -50,6 +50,10 @@ tasks.withType<KotlinCompile> {
 	}
 }
 
+tasks.bootJar {
+	archiveFileName.set("reduster.jar")
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
